@@ -1,0 +1,25 @@
+apiVersion: network.harvesterhci.io/v1alpha1
+kind: IPPool
+metadata:
+  name: net-48
+  namespace: default
+spec:
+  ipv4Config:
+    serverIP: 192.168.48.77
+    cidr: 192.168.48.0/24
+    pool:
+      start: 192.168.48.81
+      end: 192.168.48.90
+      exclude:
+      - 192.168.48.81
+      - 192.168.48.90
+    router: 192.168.48.1
+    dns:
+    - 1.1.1.1
+    domainName: aibao.moe
+    domainSearch:
+    - aibao.moe
+    ntp:
+    - pool.ntp.org
+    leaseTime: 300
+  networkName: default/net-48
