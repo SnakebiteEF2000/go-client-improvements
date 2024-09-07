@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -64,17 +65,19 @@ func run() int {
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			Waim.Process(ctx, obj)
+			ipchan := Waim.Watch(ctx, obj)
+			t := <-ipchan
+			fmt.Println("Name", t.Name)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			Waim.Process(ctx, newObj)
+			Waim.Watch(ctx, newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			Waim.Process(ctx, obj)
+			Waim.Watch(ctx, obj)
 		},
 	})
 
 	informer.Run(ctx.Done())
 
-	return 0
+	return StatusOK
 }

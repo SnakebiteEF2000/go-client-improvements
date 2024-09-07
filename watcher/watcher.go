@@ -12,30 +12,47 @@ type Watcher struct {
 	healthy atomic.Bool
 }
 
+type IppoolRes struct {
+	Name  string
+	Start string
+	End   string
+}
+
 func (wa *Watcher) IsHealthy() bool {
 	return wa.healthy.Load()
 }
 
-func (wa *Watcher) Process(ctx context.Context, obj interface{}) error {
-	//does stuff
-	customResource, err := toUnstructured(obj)
-	if err != nil {
-		log.Println("Failed to case to unstructured")
-		wa.healthy.Store(false)
-	}
-	name, startip, endip, err := getIPPoolInformation(customResource)
-	if err != nil {
-		wa.healthy.Store(false)
-	}
-	log.Printf("Name: %v", name)
-	log.Printf("Range: %v - %v", startip, endip)
+func (wa *Watcher) Watch(ctx context.Context, obj interface{}) <-chan IppoolRes {
+	ipoolChan := make(chan IppoolRes)
+
+	go processIpool(ctx, toUnstructured(obj), ipoolChan)
 
 	wa.healthy.Store(true)
-	return err
+	return ipoolChan
 }
 
-func toUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
-	return obj.(*unstructured.Unstructured), nil
+func processIpool(ctx context.Context, obj *unstructured.Unstructured, c chan IppoolRes) error {
+	select {
+	default:
+		name, startip, endip, err := getIPPoolInformation(obj)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		t := IppoolRes{
+			Name:  name,
+			Start: startip,
+			End:   endip,
+		}
+		c <- t
+		return nil
+	case <-ctx.Done():
+		return nil
+	}
+}
+
+func toUnstructured(obj interface{}) *unstructured.Unstructured {
+	return obj.(*unstructured.Unstructured)
 }
 
 func getIPPoolInformation(obj *unstructured.Unstructured) (string, string, string, error) {
