@@ -20,16 +20,11 @@ const (
 	defaultServerShutdownTimeout = 60 * time.Second
 )
 
-type HealthHandler struct {
-	HealtValue bool
-}
-
 type HealthChecker interface {
 	IsHealthy() bool
 }
 
 type MetricsCollector interface {
-	Foo()
 }
 
 type Service interface {
@@ -37,7 +32,7 @@ type Service interface {
 	MetricsCollector
 }
 
-func ListenAndServe(ctx context.Context, healthChecks ...HealthChecker) error {
+func ListenAndServe(ctx context.Context, services ...Service) error {
 	serverctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -53,6 +48,11 @@ func ListenAndServe(ctx context.Context, healthChecks ...HealthChecker) error {
 		IdleTimeout:       defaultIdleTimeout,
 		MaxHeaderBytes:    defaultMaxHeaderBytes,
 		ErrorLog:          logger,
+	}
+
+	healthChecks := make([]HealthChecker, len(services))
+	for i, service := range services {
+		healthChecks[i] = service
 	}
 
 	mux.Handle("GET /healthz", healthCheck(healthChecks...))
