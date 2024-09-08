@@ -20,8 +20,21 @@ const (
 	defaultServerShutdownTimeout = 60 * time.Second
 )
 
+type HealthHandler struct {
+	HealtValue bool
+}
+
 type HealthChecker interface {
 	IsHealthy() bool
+}
+
+type MetricsCollector interface {
+	Foo()
+}
+
+type Service interface {
+	HealthChecker
+	MetricsCollector
 }
 
 func ListenAndServe(ctx context.Context, healthChecks ...HealthChecker) error {
@@ -41,6 +54,8 @@ func ListenAndServe(ctx context.Context, healthChecks ...HealthChecker) error {
 		MaxHeaderBytes:    defaultMaxHeaderBytes,
 		ErrorLog:          logger,
 	}
+
+	mux.Handle("GET /healthz", healthCheck(healthChecks...))
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -71,4 +86,17 @@ func ListenAndServe(ctx context.Context, healthChecks ...HealthChecker) error {
 	wg.Wait()
 
 	return nil
+}
+
+func healthCheck(healthChecks ...HealthChecker) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, obj := range healthChecks {
+			if !obj.IsHealthy() {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				w.Write([]byte(http.StatusText(http.StatusServiceUnavailable)))
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 }

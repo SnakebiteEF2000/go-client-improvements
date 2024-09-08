@@ -87,6 +87,7 @@ loop:
 				break
 			}
 			log.Printf("%v\n", pools)
+			p.healthy.Store(true)
 
 			err = p.postPoolData(ctx, pools)
 			if err != nil {
@@ -97,7 +98,6 @@ loop:
 			log.Println("Shutdown...")
 			break loop
 		}
-		p.healthy.Store(true)
 	}
 }
 
