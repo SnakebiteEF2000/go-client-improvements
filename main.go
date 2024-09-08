@@ -2,20 +2,20 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
 
-	"github.com/SnakebiteEF2000/go-client-improved/watcher"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/SnakebiteEF2000/go-client-improved/informer"
+	"github.com/SnakebiteEF2000/go-client-improved/pooldataposter"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/SnakebiteEF2000/go-client-improved/monitor"
 )
 
 type StatusCode = int
@@ -24,12 +24,13 @@ const (
 	StatusOK StatusCode = iota
 	StatusConfigError
 	StatusClientError
+	StatusHTTPServerError
 )
 
 // testing only
 const Kubeconfig = "/home/thma/.kube/config"
 
-var WG sync.WaitGroup
+const resyncInterval = 5 * time.Minute
 
 func main() {
 	os.Exit(run())
@@ -55,29 +56,38 @@ func run() int {
 		return StatusClientError
 	}
 
-	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(clusterClient, 5*time.Second, corev1.NamespaceAll, nil)
-	informer := factory.ForResource(Resource).Informer()
-
-	Waim := watcher.Watcher{}
+	var watcher informer.Informer
+	poster := pooldataposter.Poster{IPPoolInformer: &watcher}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			ipchan := Waim.Watch(ctx, obj)
-			t := <-ipchan
-			fmt.Println("Name", t.Name)
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			Waim.Watch(ctx, newObj)
-		},
-		DeleteFunc: func(obj interface{}) {
-			Waim.Watch(ctx, obj)
-		},
-	})
+	var wg sync.WaitGroup
 
-	informer.Run(ctx.Done())
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		watcher.Run(ctx, clusterClient, resyncInterval)
+	}()
+
+	go func() {
+		defer wg.Done()
+		poster.Run(ctx)
+	}()
+
+	err = monitor.ListenAndServe(ctx, &poster, &watcher)
+	if err != nil {
+		slog.Error("http server failure",
+			slog.String("err", err.Error()),
+		)
+	}
+
+	wg.Wait()
+
+	if err != nil {
+		return StatusHTTPServerError
+	}
 
 	return StatusOK
 }

@@ -23,3 +23,8 @@ spec:
     - pool.ntp.org
     leaseTime: 300
   networkName: default/net-48
+
+
+
+  # healtiness timeout in kubernetes needs to be high enough
+  
