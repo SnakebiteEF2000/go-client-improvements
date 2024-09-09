@@ -86,7 +86,8 @@ loop:
 				p.healthy.Store(false)
 				break
 			}
-			log.Printf("%v\n", pools)
+
+			// debug log.Printf("%v\n", pools)
 			p.healthy.Store(true)
 
 			err = p.postPoolData(ctx, pools)

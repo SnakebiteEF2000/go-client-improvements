@@ -37,6 +37,7 @@ func main() {
 }
 
 func run() int {
+	log.Println("Starting...")
 	var clusterConfig *rest.Config
 	var err error
 
